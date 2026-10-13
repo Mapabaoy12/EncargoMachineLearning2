@@ -20,8 +20,11 @@
 
 ## Matías Turra
 ### Qué hizo en el proyecto
-* Modificó y actualizó la presentación en Canva, agregando seccion de modelos de clasificacion. *
-* Desarrolló los modelos de clasificación (LogisticRegresion,  DecissionTree) junto con una matriz de confusión y grafico de ROC AUC.
+* Modificó y actualizó la presentación en Canva, agregando la sección de modelos de clasificación.*
+* Desarrolló los modelos de clasificación (Logistic Regression y Decision Tree) junto con una matriz de confusión y un gráfico de ROC AUC.
+* Ejecutó pruebas para cada modelo de clasificación con diferentes técnicas de GridSearchCV y RandomizedSearchCV.
+* Creó el repositorio en GitHub.
+* Modificó el archivo README.md, actualizando el informe para detallar los modelos de clasificación.
 
 ---
 # 1. Descripción del Problema de Negocio
