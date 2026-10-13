@@ -4,13 +4,13 @@
 ---
 
 ## Integrante 1
-### Descripción de lo que se hizo en el proyecto
+### Qué hizo en el proyecto
 *(Escribir aquí la descripción de las actividades realizadas.)*
 
 ---
 
-## Integrante 2
-### Descripción de lo que se hizo en el proyecto
+## Benjamín Neira
+### Qué hizo en el proyecto
 * Migró el notebook anterior y lo compatibilizó con la evaluación actual, corrigiendo además detalles y celdas que afectaban la calidad del dataset. 
 * Modificó el `Pipeline` e incorporó ideas para mitigar el *overfitting* en relación con `TargetEncoder` y `OneHotEncoder` (este último descartado posteriormente). 
 * Desarrolló los modelos de regresión (LinearRegression, RandomForest y DecissionTree) junto con un gráfico de valores reales vs predichos.
@@ -19,7 +19,7 @@
 ---
 
 ## Integrante 3
-### Descripción de lo que se hizo en el proyecto
+### Qué hizo en el proyecto
 *(Escribir aquí la descripción de las actividades realizadas.)*
 
 ---
