@@ -1,5 +1,11 @@
-### Proyecto de Machine Learning: Inteligencia Musical y Predicción de Popularidad en Spotify
+# Proyecto de Machine Learning: Inteligencia Musical y Predicción de Popularidad en Spotify
+# Matriz de Responsabilidades
 
+| Integrante | Actividades realizadas |
+|---|---|---|
+| **Integrante 1** | *(describir qué hizo en el proyecto)* |
+| **Benjamín Neira** | *Migró el notebook anterior y lo compatibilizó con la evaluación actual.<br>• Corrigió detalles y celdas que afectaban la calidad del dataset.<br>• Modificó el `Pipeline` e incorporó ideas para mitigar el *overfitting* en relación con `TargetEncoder` y `OneHotEncoder` (este último descartado posteriormente).<br>• Desarrolló los modelos de regresión.<br>• Modificó y actualizó la presentación en Canva, desde el inicio hasta los modelos de regresión.<br>• Migró y actualizó el informe según la evaluación actual, y detalló en él los modelos de regresión.* |
+| **Integrante 3** | *(describir qué hizo en el proyecto)* |
 # 1. Descripción del Problema de Negocio
 
 La industria de la música en streaming se caracteriza por un volumen masivo y continuo de lanzamientos, donde plataformas líderes como Spotify incorporan diariamente decenas de miles de canciones a su catálogo global. En este entorno hipercompetitivo, la curaduría editorial de listas de reproducción (*playlists*), el diseño de recomendaciones personalizadas y el descubrimiento temprano de talentos (*Artist & Repertoire / scouting*) constituyen procesos estratégicos críticos para sostener la retención y el compromiso (*engagement*) de los suscriptores. Recomendar temas que no conectan con la audiencia eleva la tasa de abandono temprano (*skip rate*) y deteriora la experiencia del usuario, mientras que no detectar a tiempo los nuevos éxitos representa una pérdida significativa de oportunidades comerciales frente a la competencia.
