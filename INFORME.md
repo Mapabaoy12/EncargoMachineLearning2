@@ -47,7 +47,10 @@ La integración sinérgica de ambos enfoques predictivos permite resolver los de
 
 El desarrollo del proyecto se rige bajo el estándar internacional de la metodología **CRISP-DM** (*Cross-Industry Standard Process for Data Mining*), estructurando un flujo de trabajo riguroso que abarca desde la comprensión del negocio y exploración profunda de los datos hasta la ingeniería de características, el entrenamiento de modelos de regresión y clasificación, y su posterior validación cruzada. 
 
-Asimismo, la
+Asimismo, la solución incorpora desde su arquitectura inicial sólidos principios de gobernanza, privacidad y responsabilidad ética:
+* **Integridad Técnica y Criptográfica:** Certificación de la inalterabilidad de la fuente de datos mediante funciones hash SHA-256, asegurando un pipeline reproducible y blindado contra corrupciones de origen.
+* **Cumplimiento Normativo de Privacidad:** Adherencia a los marcos legales de protección de datos personales (Ley N° 21.719 en Chile y RGPD/GDPR europeo), garantizando la total ausencia de información de identificación personal (PII) de los oyentes.
+* **Auditoría de Equidad Algorítmica (*Fairness*):** Detección y mitigación de sesgos históricos que privilegien desproporcionadamente a géneros comerciales sobre expresiones independientes o alternativas, evaluando el comportamiento de ambos modelos mediante la Tasa de Impacto Dispar (*Disparate Impact Ratio* - DIR) bajo la regla del 80%.
 
 ---
 
