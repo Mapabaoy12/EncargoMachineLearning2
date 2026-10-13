@@ -321,3 +321,99 @@ pipeline_regresion = Pipeline(steps=[
     ("preprocesador", preprocesadorRE),
     ("colinealidad", CorrelationFilter(threshold=0.9))
 ])
+```
+# 6 Modelamiento
+
+## 6.1 Modelamiento Predictivo: Modelos de Regresión Continua
+
+En esta fase del proyecto (correspondiente a la etapa de *Modeling* de la metodología CRISP-DM), se implementa y evalúa el componente analítico orientado a predecir cuantitativamente el puntaje continuo de popularidad (`popularity`, escala de 0 a 100) a partir de los atributos acústicos y metadatos contextuales de Spotify.
+
+---
+
+### 6.1.1 Configuración Experimental y Espacio de Características
+
+El modelamiento de regresión se ejecuta de forma desacoplada utilizando el subconjunto de características depuradas tras el análisis de correlación y asociación del EDA:
+
+```python
+# Definición del espacio de características y variable objetivo continua
+X = df[['speechiness', 'time_signature', 'valence', 'loudness', 'instrumentalness',
+        'es_colaboracion', 'track_genre', 'artista_principal']]
+y_numerico = df['popularity'].astype(float)
+```
+
+- **Flujo de preprocesamiento (`pipeline_regresion`):** todas las transformaciones se acoplan directamente a los estimadores finales dentro de un `Pipeline` de Scikit-Learn, previniendo cualquier fuga de datos (*data leakage*) entre particiones. Estas son:
+  - Winsorizado y estandarización de las variables cuantitativas.
+  - Flujo directo de la variable binaria.
+  - `TargetEncoder(target_type="continuous", cv=5, smooth="auto")` regularizado para `track_genre` y `artista_principal`.
+- **Partición de datos:** se empleó una separación del 80% para entrenamiento (`X_train`, `y_train`) y 20% para evaluación desacoplada (`X_test`, `y_test`), fijando `random_state=42` para garantizar estricta reproducibilidad.
+
+---
+
+### 6.1.2. Algoritmos Evaluados y Estrategia de Calibración
+
+Para balancear simplicidad, interpretabilidad y capacidad de captura de patrones no lineales, se seleccionaron tres algoritmos representativos de distintas familias analíticas.
+
+#### 1. Regresión Lineal Clásica (*Linear Regression* – OLS)
+
+- **Rol metodológico:** funciona como la línea base obligatoria (*baseline*) para cuantificar el margen de mejora que aportan los modelos más complejos.
+- **Decisión sobre `GridSearchCV`:** inicialmente se ejecutó una optimización mediante `GridSearchCV` sobre los hiperparámetros disponibles en Mínimos Cuadrados Ordinarios (`fit_intercept` y `positive`). Los resultados evidenciaron que la variación en el error fue prácticamente nula, lo cual es esperable debido a que OLS calcula sus coeficientes de manera analítica directa y carece de términos de regularización de complejidad ($\lambda$ o $\alpha$). Conforme al principio de parsimonia (Navaja de Ockham), se prescindió de `GridSearchCV` para evitar sobrecarga computacional innecesaria.
+
+#### 2. Árbol de Decisión de Regresión (*Decision Tree Regressor*)
+
+- **Rol metodológico:** modelo no paramétrico individual diseñado para evaluar la existencia de reglas condicionales y particiones ortogonales en el espacio acústico.
+- **Configuración:** evaluado en su forma base, sin restricciones de poda. Al no limitar su profundidad ni el tamaño mínimo de sus hojas, sirvió como diagnóstico del comportamiento de la varianza del catálogo frente a árboles sin podar (*unpruned trees*).
+
+#### 3. Bosque Aleatorio (*Random Forest Regressor*) — Modelo Seleccionado
+
+- **Rol metodológico:** algoritmo de ensamble por agregación (*bagging*) que promedia múltiples árboles de decisión descorrelacionados, reduciendo sustancialmente el error de varianza sin incrementar el sesgo.
+- **Hiperparámetros de control de sobreajuste:** con el fin de evitar que los árboles individuales memorizaran el catálogo y obligar al ensamble a derivar reglas comerciales generalizables, se establecieron parámetros de poda rigurosos:
+
+| Hiperparámetro | Valor | Descripción |
+|---|---|---|
+| `n_estimators` | 150 | Cantidad de estimadores en el bosque, asegurando estabilidad y convergencia en la reducción del error residual. |
+| `max_depth` | 12 | Límite máximo de profundidad por árbol para impedir ramificaciones excesivamente profundas que aíslen pistas únicas. |
+| `min_samples_leaf` | 15 | Exige un mínimo de 15 canciones por nodo terminal, forzando a que cada predicción sea el promedio representativo de un colectivo musical y no un caso atípico memorizado. |
+| `min_samples_split` | 30 | Umbral mínimo de muestras para autorizar una nueva división interna. |
+| `n_jobs` | -1 | Paralelización total del cómputo sobre todos los núcleos de CPU. |
+| `random_state` | 42 | Semilla determinista para asegurar reproducibilidad exacta. |
+
+---
+
+### 6.1.3. Análisis e Interpretación de los Resultados
+
+#### 1. Colapso del Árbol de Decisión Individual
+
+El árbol de decisión sin restricciones evidenció la vulnerabilidad clásica de los modelos no paramétricos. Al obtener un score de evaluación en test de apenas $0.17$ y un MAE elevado a $11.60$ puntos, demostró que un único árbol genera particiones demasiado sensibles al ruido muestral, volviéndose inoperante para el negocio.
+
+#### 2. Rendimiento de la Regresión Lineal
+
+La regresión lineal ofreció un desempeño respetable ($R^2 = 0.73$, $\text{MAE} = 9.20$, Test Score $= 0.54$), demostrando que la codificación con `TargetEncoder` continuo le aportó una señal fuerte y compacta. No obstante, al restringirse a relaciones puramente aditivas, subestima el efecto combinado entre variables como sonoridad e instrumentalidad.
+
+#### 3. Superioridad y Solidez de Random Forest
+
+El ensamble regularizado superó a todos los competidores en cada una de las dimensiones evaluadas:
+
+- Mayor coeficiente de determinación ($R^2 = 0.75$).
+- Score de generalización más alto en prueba ($0.56$).
+- Menor error medio ($\text{MAE} = 8.60$ puntos).
+
+Gracias a los hiperparámetros de poda (`min_samples_leaf=15`, `max_depth=12`), la brecha respecto al entrenamiento ($0.69$ vs $0.56$) se mantuvo sumamente controlada, evitando el sobreajuste masivo habitual de los bosques no calibrados.
+
+### 6.1.4. Diagnóstico del Gráfico (Reales vs. Predichos) de Regresión y Alineación con KPIs
+
+El análisis visual del plano de dispersión frente a la recta de identidad ($y = \hat{y}$) aporta información analítica crucial para la toma de decisiones editoriales:
+
+#### 1. Alineación Central y Tendencia Global
+
+Las estimaciones se concentran alrededor de la línea diagonal ideal a lo largo de la mayor parte de la distribución comercial (rango de 20 a 70 puntos), confirmando que el bosque captura la tendencia estructural de la popularidad sin sesgos pronunciados de desplazamiento vertical.
+
+#### 2. Contracción hacia la Media en los Extremos
+
+Se evidencia el fenómeno estadístico habitual en modelos de regresión tabular:
+
+- **En temas impopulares ($\text{Popularidad} < 15$):** el modelo tiende a sobrestimar ligeramente el puntaje, amortiguado por el suavizado empírico bayesiano del `TargetEncoder`.
+- **En éxitos masivos globales ($\text{Popularidad} > 80$):** el modelo exhibe una leve infraestimación conservadora debida al promedio de las hojas (`min_samples_leaf=15`), evitando predecir valores de 95-100 a menos que múltiples atributos y el artista respalden sólidamente dicho nivel.
+
+#### 3. Cumplimiento del KPI Técnico
+
+Con un $\text{MAE} = 8.60$ puntos de error absoluto sobre una escala continua de 0 a 100, el modelo asegura un margen de discrepancia acotado a menos de un 9% del rango completo del catálogo, proveyendo al equipo editorial de Spotify un predictor numérico robusto y calibrado para rankear canciones y priorizar lanzamientos en listas de reproducción.
