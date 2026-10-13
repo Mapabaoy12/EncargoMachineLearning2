@@ -11,9 +11,11 @@
 
 ## Integrante 2
 ### Descripción de lo que se hizo en el proyecto
-Migró el notebook anterior y lo compatibilizó con la evaluación actual, corrigiendo además detalles y celdas que afectaban la calidad del dataset. Modificó el `Pipeline` e incorporó ideas para mitigar el *overfitting* en relación con `TargetEncoder` y `OneHotEncoder` (este último descartado posteriormente). Desarrolló los modelos de regresión.
-Asimismo, modificó y actualizó la presentación en Canva, desde el inicio hasta los modelos de regresión, y migró y actualizó el informe según la evaluación actual, detallando en él los modelos de regresión.
-
+* Migró el notebook anterior y lo compatibilizó con la evaluación actual, corrigiendo además detalles y celdas que afectaban la calidad del dataset. 
+* Modificó el `Pipeline` e incorporó ideas para mitigar el *overfitting* en relación con `TargetEncoder` y `OneHotEncoder` (este último descartado posteriormente). 
+* Desarrolló los modelos de regresión (LinearRegression, RandomForest y DecissionTree) junto con un gráfico de valores reales vs predichos.
+* Modificó y actualizó la presentación en Canva, desde el inicio hasta los modelos de regresión. 
+* Migró y actualizó el informe según la evaluación actual, abarcando el objetivo general, los objetivos específicos, los KPIs y todo el *Pipeline*. Además, creó el apartado de Modelamiento, en el cual detalló los modelos de regresión.
 ---
 
 ## Integrante 3
