@@ -220,6 +220,110 @@ Uno de los hallazgos técnicos más críticos del proyecto fue la necesidad de d
 2. **Pipeline para Regresión (`pipe_te_re`) y Diagnóstico del Error de Sobresaturación:**
    * Al intentar reutilizar el encoder por defecto (`target_type="auto"`) sobre la variable cuantitativa `popularity`, Scikit-Learn detectó que el target contenía números enteros (`int64` entre 0 y 100) y **asumió erróneamente que se trataba de un problema de clasificación con ~101 clases independientes**.
    * Esta confusión conceptual provocó dos fallos críticos en la etapa de modelamiento:
-     1. **Advertencia de Partición:** Arrojó la alerta `/usr/local/lib/python3.13/dist-packages/sklearn/model_selection/_split.py:805: UserWarning: The least populated class in y has only 1 members, which is less than n_splits=5`, debido a que valores extremos de popularidad (p. ej., 98 o 100) contaban con
-X_train_procesado = preprocesador.fit_transform(X_train, y_train)
-X_test_procesado = preprocesador.transform(X_test)
+     1. **Advertencia de Partición:** Arrojó la alerta `/usr/local/lib/python3.13/dist-packages/sklearn/model_selection/_split.py:805: UserWarning: The least populated class in y has only 1 members, which is less than n_splits=5`, debido a que valores extremos de popularidad (p. ej., 98 o 100) contaban con una sola pista en el catálogo, imposibilitando la estratificación interna.
+     2. **Explosión Dimensional y Colapso del Score:** El codificador generó más de 100 columnas internas por variable (una por cada entero de clase). Al alimentar estos cientos de variables colineales en una `LinearRegression` sin regularización, los coeficientes matemáticos se desestabilizaron al orden de $10^6$, haciendo colapsar el score de entrenamiento a un aberrante **$R^2 = -385.29144$** debido a la discrepancia entre el ajuste *out-of-fold* y la transformación final.
+   * **Solución y Parametrización Definitiva:** Se estabilizó el pipeline fijando parámetros explícitos:
+     * `target_type="continuous"`: Fuerza al transformador a tratar `popularity` como una escala cuantitativa real, aplicando validación $K$-Fold estándar de regresión y emitiendo exactamente una sola columna continua flotante por variable categórica.
+     * `smooth="auto"`: Aplica contracción empírica bayesiana (*shrinkage*), promediando las categorías con pocas canciones hacia la media global del catálogo para neutralizar *outliers* y éxitos fortuitos de artistas emergentes.
+     * `cv=5`: Implementa validación interna cruzada de 5 pliegues durante el ajuste, asegurando que cada canción sea codificada excluyendo su propio valor de popularidad, erradicando la fuga de datos (*target leakage*).
+     * `random_state=42`: Garantiza la total reproducibilidad en la partición de los pliegues internos.
+
+---
+
+#### 5.6.4. Tratamiento Numérico Robusto y Filtro de Colinealidad
+* **Sub-pipeline Numérico (`pipe_num`):**
+  * **`WinsorizerRobusto(limits=(0.02, 0.02))`:** Trunca de forma determinista el 2% inferior y superior de las colas de distribución en las variables continuas, amortiguando el impacto de valores extremos legítimos.
+  * **`SimpleImputer(strategy="mean")`:** Se seleccionó la media aritmética para la imputación de nulos residuales; al haber aplicado previamente el winsorizado, los valores atípicos ya no distorsionan la tendencia central, convirtiendo a la media en una estimación robusta y matemáticamente eficiente.
+  * **`StandardScaler()`:** Centra las variables en media $0$ y varianza unitaria ($Z$-score), requerimiento indispensable para la convergencia y estabilidad de estimadores lineales y basados en distancias.
+* **Capa de Control de Redundancia (`CorrelationFilter(threshold=0.9)`):** Integrada al final de cada pipeline integral para detectar e interceptar pares de variables con colinealidad extrema ($r > 0.90$), previniendo problemas de rango incompleto en las matrices y distorsiones en la asignación de importancia de variables.
+
+---
+
+#### 5.6.5. Implementación del Código en Scikit-Learn
+
+```python
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import FunctionTransformer, StandardScaler, TargetEncoder
+
+# ==============================================================================
+# 1. ENRUTAMIENTO DE CARACTERÍSTICAS
+# ==============================================================================
+cols_num = ['speechiness', 'time_signature', 'valence', 'loudness', 'instrumentalness']
+cols_bin = ['es_colaboracion']
+cols_nom_te = ['artista_principal', 'track_genre']
+
+# ==============================================================================
+# 2. SUB-PIPELINES DE TRANSFORMACIÓN
+# ==============================================================================
+# Pipeline Numérico: Winsorizado, Imputación por Media y Estandarización
+pipe_num = Pipeline(
+    steps=[
+        ("winsorizer", WinsorizerRobusto(limits=(0.02, 0.02))),
+        ("imputacion", SimpleImputer(strategy="mean")),  # La media es robusta tras el recorte de colas
+        ("escalado", StandardScaler())
+    ]
+)
+
+# Pipeline Categórico para CLASIFICACIÓN (TargetEncoder multiclase nativo)
+pipe_te_cl = Pipeline(
+    steps=[
+        ("imputacion", SimpleImputer(strategy="most_frequent")),
+        ("encoder", TargetEncoder())
+    ]
+)
+
+# Pipeline Categórico para REGRESIÓN (TargetEncoder continuo y regularizado)
+pipe_te_re = Pipeline(
+    steps=[
+        ("imputacion", SimpleImputer(strategy="most_frequent")),
+        ("encoder", TargetEncoder(
+            target_type="continuous",
+            smooth="auto",
+            cv=5,
+            random_state=42
+        ))
+    ]
+)
+
+# ==============================================================================
+# 3. ENSAMBLAJE DE PREPROCESADORES (ColumnTransformer)
+# ==============================================================================
+# Preprocesador para Clasificación
+preprocesadorCL = ColumnTransformer(
+    transformers=[
+        ("num", pipe_num, cols_num),
+        ("bin", "passthrough", cols_bin),
+        ("nom_te", pipe_te_cl, cols_nom_te)
+    ],
+    remainder="passthrough",
+    verbose_feature_names_out=False
+).set_output(transform="pandas")
+
+# Preprocesador para Regresión
+preprocesadorRE = ColumnTransformer(
+    transformers=[
+        ("num", pipe_num, cols_num),
+        ("bin", "passthrough", cols_bin),
+        ("nom_te", pipe_te_re, cols_nom_te)
+    ],
+    remainder="passthrough",
+    verbose_feature_names_out=False
+).set_output(transform="pandas")
+
+# ==============================================================================
+# 4. PIPELINES GLOBALES DE PRODUCCIÓN
+# ==============================================================================
+pipeline_clasificacion = Pipeline(steps=[
+    ("duplicados", FunctionTransformer()),
+    ("preprocesador", preprocesadorCL),
+    ("colinealidad", CorrelationFilter(threshold=0.9))
+])
+
+pipeline_regresion = Pipeline(steps=[
+    ("duplicados", FunctionTransformer()),
+    ("preprocesador", preprocesadorRE),
+    ("colinealidad", CorrelationFilter(threshold=0.9))
+])
