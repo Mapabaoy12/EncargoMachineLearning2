@@ -18,9 +18,10 @@
 * Migró y actualizó el informe según la evaluación actual, abarcando el objetivo general, los objetivos específicos, los KPIs y todo el *Pipeline*. Además, creó el apartado de Modelamiento, en el cual detalló los modelos de regresión.
 ---
 
-## Integrante 3
+## Matías Turra
 ### Qué hizo en el proyecto
-*(Escribir aquí la descripción de las actividades realizadas.)*
+* Modificó y actualizó la presentación en Canva, agregando seccion de modelos de clasificacion. *
+* Desarrolló los modelos de clasificación (LogisticRegresion,  DecissionTree) junto con una matriz de confusión y grafico de ROC AUC.
 
 ---
 # 1. Descripción del Problema de Negocio
@@ -62,6 +63,7 @@ Desarrollar un pipeline integral de preparación de datos y una solución analí
 * **Auditar y evaluar sesgos algorítmicos y de representatividad (Fairness):** Detectar la presencia de sesgos de selección e históricos dentro del catálogo musical (tales como la sobrerrepresentación de estilos comerciales en detrimento de escenas independientes), evaluando el impacto ético del modelo mediante métricas de justicia algorítmica como la Tasa de Impacto Dispar (*Disparate Impact Ratio*) bajo la regla del 80%.
 * **Diseñar e implementar ingeniería de características vectorizada:** Generar nuevos predictores basados en interacciones acústicas (p. ej., combinación aditiva de valencia e instrumentalidad, segregación de artista principal y detección binaria de colaboraciones), mitigando el impacto de la alta cardinalidad mediante técnicas avanzadas de transformación y codificación (*Target Encoding* y *One-Hot Encoding*).
 * **Construir un pipeline de preprocesamiento desacoplado y reproducible:** Estructurar un flujo modular mediante `ColumnTransformer` y separación estricta de particiones de entrenamiento y prueba (*Train/Test split*), garantizando la reproducibilidad metodológica y la preparación de los datos para la futura fase de modelamiento predictivo (regresión o clasificación).
+* **Implementar y comparar modelos de aprendizaje supervisado (Regresión y Clasificación):** Entrenar algoritmos (como Random Forest, Decision Tree y Regresión Logística) para estimar el puntaje continuo y categorizar el nivel de popularidad, optimizando hiperparámetros y evaluando su rendimiento predictivo mediante métricas clave (MAE, F1-Score, ROC AUC).
 
 # 3. Definición de KPIs del Proyecto
 
@@ -440,3 +442,47 @@ Se evidencia el fenómeno estadístico habitual en modelos de regresión tabular
 #### 3. Cumplimiento del KPI Técnico
 
 Con un $\text{MAE} = 8.60$ puntos de error absoluto sobre una escala continua de 0 a 100, el modelo asegura un margen de discrepancia acotado a menos de un 9% del rango completo del catálogo, proveyendo al equipo editorial de Spotify un predictor numérico robusto y calibrado para rankear canciones y priorizar lanzamientos en listas de reproducción.
+
+## 6.2 Modelamiento Predictivo: Modelos de Clasificación Multiclase
+
+Como enfoque complementario a la regresión, el problema se abordó desde la perspectiva de clasificación ordinal, segmentando la popularidad de las canciones en 5 niveles estratégicos (*Muy Baja*, *Baja*, *Media*, *Alta*, *Muy Alta*). Este enfoque está diseñado para facilitar decisiones operativas ágiles en la asignación de pistas a listas de reproducción.
+
+### 6.2.1 Configuración y Algoritmos Evaluados
+El pipeline de clasificación incluyó la transformación categórica mediante `TargetEncoder` configurado en modo multiclase (`target_type="auto"`). Este encoder logró absorber la mayor parte de la señal predictiva proveniente de los artistas y géneros, estableciendo un techo predictivo robusto.
+
+Para el modelamiento, se contrastaron dos enfoques analíticos:
+1. **Árbol de Decisión (Decision Tree Classifier):** Un modelo no lineal evaluado inicialmente en su forma base (lo que resultó en sobreajuste) y posteriormente optimizado.
+2. **Regresión Logística (Logistic Regression):** Un modelo lineal multiclase (*One-vs-Rest*) utilizado por su alta interpretabilidad y cálculo directo de probabilidades.
+
+### 6.2.2 Optimización de Hiperparámetros y Resultados
+Ambos modelos fueron sometidos a un proceso de optimización utilizando `RandomizedSearchCV` con validación cruzada estratificada (StratifiedKFold de 5 splits) y 15 iteraciones, buscando maximizar la métrica `f1_weighted`. 
+
+En el caso del Árbol de Decisión, se restringió severamente la profundidad máxima (`max_depth`) y el número de muestras por hoja (`min_samples_leaf`) para erradicar el sobreajuste inicial. Los resultados sobre el conjunto de prueba (*Test Set*) fueron los siguientes:
+
+* **Decision Tree (Optimizado):** Accuracy: 0.6951 | F1-Score: 0.6936 | ROC AUC: 0.9126
+* **Regresión Logística (Optimizada):** Accuracy: 0.6934 | F1-Score: 0.6919 | ROC AUC: 0.9136
+
+### 6.2.3 Análisis de Resultados y Selección del Modelo
+Aunque ambos algoritmos promediaron un desempeño global de clasificación casi idéntico (un empate técnico en ~69% de Accuracy), la prueba de contraste de predicciones exactas demostró que los modelos llegaron a esta cifra por caminos matemáticos distintos, tomando decisiones diferentes en aproximadamente el 15% del catálogo de prueba. 
+
+Para la implementación final, **se seleccionó la Regresión Logística Optimizada** debido a dos factores críticos para el negocio:
+1. **Mejor Separación Probabilística:** Su puntaje ROC AUC ligeramente superior (0.9136) garantiza una mayor seguridad y confianza matemática al momento de diferenciar y asignar una canción a una clase de popularidad específica.
+2. **Interpretabilidad Superior (Feature Importance):** A diferencia de las ramificaciones opacas de un árbol, los coeficientes lineales de la Regresión Logística permiten explicar de manera transparente a los *stakeholders* qué peso exacto tiene cada variable (como el nivel de *speechiness* o las colaboraciones) en el éxito de una canción, facilitando auditorías y justificaciones ejecutivas.
+
+### 6.2.4 Análisis de la Matriz de Confusión
+La Matriz de Confusión de la Regresión Logística permite auditar la precisión del modelo al clasificar canciones en cada nivel de popularidad. A partir de los resultados observados, se extraen las siguientes conclusiones operativas:
+1. **Alta Precisión en los Extremos:** El modelo exhibe su mayor capacidad de acierto en las categorías extremas. Logra clasificar correctamente 2877 canciones como Muy Baja y 2837 como Baja. Esto indica que las pistas con nula o escasa tracción comercial poseen patrones acústicos y de metadatos muy distinguibles, lo que permite al algoritmo descartarlas con seguridad, optimizando la recomendación de catálogo y evitando la fatiga auditiva del usuario.
+2. **Dificultad en Categorías Adyacentes (Zonas Grises):** Como es habitual en problemas de clasificación ordinal, los errores se concentran casi exclusivamente en categorías contiguas. Por ejemplo, al predecir canciones de popularidad Media, el modelo clasifica correctamente 2439 pistas, pero confunde 557 con popularidad Baja y 435 con Alta. Esto refleja la naturaleza difusa del éxito intermedio, donde la diferencia entre una canción regular y un éxito incipiente suele depender de factores externos no audibles (como el presupuesto de marketing o la viralidad en redes sociales).
+3. **Detección Sólida de Éxitos:** En la clase Muy Alta, el algoritmo clasifica correctamente 2380 pistas. Aunque presenta cierta confusión con la categoría Alta (274 casos), el error cruzado hacia clases de fracaso comercial (Muy Baja o Baja) es prácticamente inexistente (menos de 250 casos sumados). Esto garantiza que el modelo es altamente confiable para identificar canciones con potencial de entrar en playlists destacadas, cumpliendo con el objetivo de Scouting.
+
+### Importancia de Variables (Feature Importance) y Conclusiones de Negocio
+El análisis del comportamiento de la Regresión Logística optimizada permite extraer conclusiones fundamentales sobre la dinámica del mercado musical en streaming:
+
+El peso comercial recae de manera desproporcionada en la marca personal del artista y el género musical (capturados de manera sobresaliente por el TargetEncoder). Las variables acústicas puras (como danceability o loudness) actúan únicamente como moduladores secundarios. En particular, la baja presencia de palabras habladas (speechiness) y la suma sinérgica entre valencia e instrumentalidad demuestran tener un impacto medible en la probabilidad de éxito de una canción.
+
+Este hallazgo valida una hipótesis fundamental del negocio: el éxito en Spotify no es puramente acústico, sino impulsado fuertemente por la identidad del creador y el nicho al que pertenece. La integración de la Regresión Logística permite al equipo de scouting cuantificar con exactitud el peso de estos factores al evaluar nuevas adquisiciones para el catálogo.
+
+### Cumplimiento KPIs clasificacion
+El despliegue de los modelos predictivos y su posterior optimización permiten evaluar directamente el impacto de la solución frente a los Indicadores Clave de Rendimiento (KPIs) definidos al inicio del proyecto:
+1. **KPI Técnico de Clasificación (Meta: $> 0.60$ en F1-Score, Precision y Recall):** La Regresión Logística Optimizada superó holgadamente este umbral, alcanzando un desempeño ponderado de $0.69$ tanto en Precision, Recall y F1-Score, junto con un Accuracy global del 69% y un asombroso ROC AUC de 0.91. Esto garantiza a Spotify una herramienta de categorización altamente robusta, superando por casi 10 puntos porcentuales la meta técnica establecida.
+2. **KPI de Negocio: Tasa de Detección Temprana de Éxitos (Meta: $\ge 50\%$):** El objetivo de negocio exigía que el sistema fuera capaz de identificar al menos la mitad de las canciones con alto potencial. Al observar el Recall (Sensibilidad) en el reporte de clasificación de nuestro modelo, comprobamos que para las categorías de éxito el sistema identifica correctamente el 56% de las canciones de popularidad "Alta" y el 68% de las pistas de popularidad "Muy Alta". Esto significa que el algoritmo cumple y supera la meta de descubrir más del 50% de los hits ocultos del catálogo, viabilizando directamente el trabajo del equipo de Scouting editorial.
