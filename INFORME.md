@@ -3,9 +3,12 @@
 
 ---
 
-## Integrante 1
+## Gustavo Alvial
 ### Qué hizo en el proyecto
-*(Escribir aquí la descripción de las actividades realizadas.)*
+* Generó el notebook asociado al modelo de segmentación.
+* Desarrolló el modelo de segmentación (K-Means), modificando el `Pipeline` y el dataset acorde al objetivo del modelo.
+* Caracterizó los clusters de la segmentación realizada, incluyendo visualizaciones que faciliten la interpretabilidad.
+* Modificó y actualizó la presentación en Canva, agregando la sección de modelo de segmentación y visualizaciones afínes.
 
 ---
 
@@ -57,7 +60,7 @@ Asimismo, la solución incorpora desde su arquitectura inicial sólidos principi
 # 2. Objetivos del Proyecto
 
 ### 2.1. Objetivo General
-Desarrollar un pipeline integral de preparación de datos y una solución analítica de Machine Learning bajo la metodología CRISP-DM, que permita predecir la popularidad de canciones en Spotify a partir de sus atributos acústicos y metadatos contextuales, identificando los factores determinantes del éxito musical para fundamentar la toma de decisiones en curaduría editorial y scouting artístico, garantizando la integridad de los datos, la reproducibilidad del proceso y la equidad algorítmica.
+Desarrollar un pipeline integral de preparación de datos y una solución analítica de Machine Learning bajo la metodología CRISP-DM, que permita predecir la popularidad de canciones en Spotify a partir de sus atributos acústicos y metadatos contextuales, así como determinar perfiles musicales mediante segmentación para optimizar las recomendaciones y la generación de listas de reproducción automáticas, identificando los factores determinantes del éxito musical para fundamentar la toma de decisiones en curaduría editorial y scouting artístico, garantizando la integridad de los datos, la reproducibilidad del proceso y la equidad algorítmica.
 
 ---
 
@@ -70,6 +73,8 @@ Desarrollar un pipeline integral de preparación de datos y una solución analí
 * **Diseñar e implementar ingeniería de características vectorizada:** Generar nuevos predictores basados en interacciones acústicas (p. ej., combinación aditiva de valencia e instrumentalidad, segregación de artista principal y detección binaria de colaboraciones), mitigando el impacto de la alta cardinalidad mediante técnicas avanzadas de transformación y codificación (*Target Encoding* y *One-Hot Encoding*).
 * **Construir un pipeline de preprocesamiento desacoplado y reproducible:** Estructurar un flujo modular mediante `ColumnTransformer` y separación estricta de particiones de entrenamiento y prueba (*Train/Test split*), garantizando la reproducibilidad metodológica y la preparación de los datos para la futura fase de modelamiento predictivo (regresión o clasificación).
 * **Implementar y comparar modelos de aprendizaje supervisado (Regresión y Clasificación):** Entrenar algoritmos (como Random Forest, Decision Tree y Regresión Logística) para estimar el puntaje continuo y categorizar el nivel de popularidad, optimizando hiperparámetros y evaluando su rendimiento predictivo mediante métricas clave (MAE, F1-Score, ROC AUC).
+* **Identificar y caracterizar perfiles musicales:** Agrupar el catálogo mediante K-Means a partir de sus atributos acústicos para descubrir arquetipos claros y definir su identidad sonora.
+* **Optimizar la estructura de los clústeres:** Determinar el número ideal de grupos ($K$) mediante métricas de validación (como el coeficiente de silueta) para garantizar una segmentación robusta y sin solapamientos.
 
 # 3. Definición de KPIs del Proyecto
 
@@ -270,7 +275,12 @@ Uno de los hallazgos técnicos más críticos del proyecto fue la necesidad de d
 
 ---
 
-#### 5.6.5. Implementación del Código en Scikit-Learn
+#### 5.6.5. Pipeline Orientado a Segmentación
+* **`RobustScaler()`:** A diferencia de la estandarización clásica basada en la media y la desviación estándar (la cual es altamente vulnerable a los valores atípicos), RobustScaler utiliza el rango intercuartílico (IQR) y la mediana. Esto permite centrar y escalar los datos de manera efectiva sin que los outliers distorsionen la transformación, preservando la integridad de la distribución subyacente.
+* **`SimpleImputer(strategy="median")`:** Se selecciona la mediana en lugar de la media debido a la presencia significativa de valores atípicos (outliers) en las variables de interés. Al ser una medida de tendencia central robusta ante valores extremos, la mediana evita que los datos faltantes sean sesgados por distribuciones sesgadas o anomalías.
+---
+
+#### 5.6.6. Implementación del Código en Scikit-Learn
 
 ```python
 # ==============================================================================
@@ -279,7 +289,8 @@ Uno de los hallazgos técnicos más críticos del proyecto fue la necesidad de d
 cols_num = ['speechiness', 'time_signature', 'valence', 'loudness', 'instrumentalness']
 cols_bin = ['es_colaboracion']
 cols_nom_te = ['artista_principal', 'track_genre']
-
+# Específico de segmentación
+cols_num = ['danceability','energy','loudness','speechiness','acousticness','instrumentalness','liveness','tempo','valence']
 # ==============================================================================
 # 2. SUB-PIPELINES DE TRANSFORMACIÓN
 # ==============================================================================
@@ -313,6 +324,14 @@ pipe_te_re = Pipeline(
     ]
 )
 
+# Pipeline numérico de segmentación: Escalado robusto e imputación por mediana
+pipe_num = Pipeline(
+    steps=[
+        ("imputacion", SimpleImputer(strategy="median")),
+        ("escalado", RobustScaler())
+    ]
+)
+
 # ==============================================================================
 # 3. ENSAMBLAJE DE PREPROCESADORES (ColumnTransformer)
 # ==============================================================================
@@ -335,6 +354,14 @@ preprocesadorRE = ColumnTransformer(
         ("nom_te", pipe_te_re, cols_nom_te)
     ],
     remainder="passthrough",
+    verbose_feature_names_out=False
+).set_output(transform="pandas")
+
+# Preprocesador para Segmentación
+preprocesadorSE = ColumnTransformer(
+    transformers=[
+        ("num", pipe_num, cols_num)
+    ],
     verbose_feature_names_out=False
 ).set_output(transform="pandas")
 
@@ -481,12 +508,36 @@ La Matriz de Confusión de la Regresión Logística permite auditar la precisió
 2. **Dificultad en Categorías Adyacentes (Zonas Grises):** Como es habitual en problemas de clasificación ordinal, los errores se concentran casi exclusivamente en categorías contiguas. Por ejemplo, al predecir canciones de popularidad Media, el modelo clasifica correctamente 2439 pistas, pero confunde 557 con popularidad Baja y 435 con Alta. Esto refleja la naturaleza difusa del éxito intermedio, donde la diferencia entre una canción regular y un éxito incipiente suele depender de factores externos no audibles (como el presupuesto de marketing o la viralidad en redes sociales).
 3. **Detección Sólida de Éxitos:** En la clase Muy Alta, el algoritmo clasifica correctamente 2380 pistas. Aunque presenta cierta confusión con la categoría Alta (274 casos), el error cruzado hacia clases de fracaso comercial (Muy Baja o Baja) es prácticamente inexistente (menos de 250 casos sumados). Esto garantiza que el modelo es altamente confiable para identificar canciones con potencial de entrar en playlists destacadas, cumpliendo con el objetivo de Scouting.
 
+## 6.3 Modelamiento de segmentación: Perfilamiento sonoro
+
+El modelo implementado corresponde a un sistema de aprendizaje no supervisado basado en el algoritmo $K$-Means, precedido por una etapa sistemática de preprocesamiento de datos y estandarización. Su objetivo estratégico es agrupar las pistas musicales de Spotify según su perfil sonoro para optimizar la recomendación de contenidos y la generación automatizada de listas de reproducción por similitud acústica.
+
+### 6.3.1 Análisis de resultados
+
+Para determinar el número óptimo de clústeres ($k$), se evaluó el comportamiento de la inercia (Suma de los Cuadrados Intra-clúster o WCSS) en un rango de $k \in [1, 10]$ utilizando el método del codo (KneeLocator), complementado con el análisis del coeficiente de silueta (Silhouette Score).
+
+* K Óptimo Identificado: El algoritmo determinó un valor óptimo de $k = 3$.
+* Inercia y Codo: La curva de inercias muestra una desaceleración en la tasa de caída a partir de $k = 3$, lo que indica un punto de equilibrio adecuado entre la complejidad del modelo y la compacidad de los grupos.
+* Desempeño de Separación: Las particiones espaciales muestran una convergencia estable utilizando una semilla fija, logrando separar de forma clara los espacios vectoriales dominados por características acústicas contrastantes.
+
+### 6.3.2 Caracterización de los clusters
+
+A partir del análisis de las centroides y la distribución de las variables en los 3 grupos resultantes, es posible perfilar los siguientes segmentos musicales:
+
+* Cluster 0 (El núcleo de la plataforma): Concentra aproximadamente el 75% del total de canciones. Al ser el grupo mayoritario, presenta la mayor variedad de géneros (113 géneros únicos) y los niveles más altos de popularidad mediana, consolidándose como la columna vertebral del catálogo. Dado que alberga la mayor variedad de géneros y canciones populares, este cluster debe ser la "puerta de entrada" para nuevos usuarios. Este es el lugar natural para ubicar lanzamientos masivos, promociones de artistas consolidados y campañas publicitaria generales.
+
+* Cluster 1 (Nicho de relajación y escucha activa): Muestra una marcada especialización con una baja diversificación (solo 104 géneros únicos). Sus canciones están fuertemente orientadas a contextos de bienestar, calma y concentración. Se pueden diseñar y promocionar playlists temáticas basadas en momentos del día o actividades. 
+
+* Cluster 2 (Nicho de alta energía): Es el segmento más exclusivo o minoritario del dataset (X% del total), enfocado principalmente en ritmos de baile, optimismo y notas alegres, alejándose del promedio general de la plataforma. Aunque sea el segmento más pequeño, crear playlists para entrenamiento, fiestas o fin de semana puede generar altos niveles de retención, debido a la pasionalidad que se asocia al tipo de música.
+
 ### Importancia de Variables (Feature Importance) y Conclusiones de Negocio
 El análisis del comportamiento de la Regresión Logística optimizada permite extraer conclusiones fundamentales sobre la dinámica del mercado musical en streaming:
 
 El peso comercial recae de manera desproporcionada en la marca personal del artista y el género musical (capturados de manera sobresaliente por el TargetEncoder). Las variables acústicas puras (como danceability o loudness) actúan únicamente como moduladores secundarios. En particular, la baja presencia de palabras habladas (speechiness) y la suma sinérgica entre valencia e instrumentalidad demuestran tener un impacto medible en la probabilidad de éxito de una canción.
 
 Este hallazgo valida una hipótesis fundamental del negocio: el éxito en Spotify no es puramente acústico, sino impulsado fuertemente por la identidad del creador y el nicho al que pertenece. La integración de la Regresión Logística permite al equipo de scouting cuantificar con exactitud el peso de estos factores al evaluar nuevas adquisiciones para el catálogo.
+
+El análisis del comportamiento del modelo de segmentación no supervisada permite extraer conclusiones fundamentales sobre la dinámica del catálogo musical: la agrupación mediante $K$-Means demuestra que el espacio acústico de Spotify se divide de manera natural en perfiles sónicos claramente diferenciados (comercial, alta energía y atmosféricos/experimentales). Esta estructuración valida que, si bien la identidad del artista define el posicionamiento de mercado, las propiedades físicas de las pistas determinan los contextos de consumo y las preferencias de escucha de los usuarios.
 
 #### Cumplimiento KPIs clasificación
 El despliegue de los modelos predictivos y su posterior optimización permiten evaluar directamente el impacto de la solución frente a los Indicadores Clave de Rendimiento (KPIs) definidos al inicio del proyecto:
