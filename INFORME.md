@@ -242,12 +242,6 @@ Uno de los hallazgos técnicos más críticos del proyecto fue la necesidad de d
 #### 5.6.5. Implementación del Código en Scikit-Learn
 
 ```python
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import FunctionTransformer, StandardScaler, TargetEncoder
-
 # ==============================================================================
 # 1. ENRUTAMIENTO DE CARACTERÍSTICAS
 # ==============================================================================
